@@ -8,6 +8,8 @@ function ShowError(errtxt)
 }
 //ShowError("This is a test error");
 
+
+
 function GLmain()
 {
 /**@type {HTMLCanvasElement | null}*/
@@ -28,6 +30,9 @@ function GLmain()
     const vertsource = `#version 300 es
     precision mediump float;
 
+    uniform vec2 campos;
+    uniform float aspect;
+
     vec2 poss[3] = vec2[]
     (
         vec2(-1.0, -1.0),
@@ -40,21 +45,20 @@ function GLmain()
     void main()
     {
         gl_Position = vec4(poss[gl_VertexID], 0.0, 1.0);
-        uv = poss[gl_VertexID];
+        uv = (poss[gl_VertexID] + campos) * 8.0;
+        uv.y = uv.y * aspect;
     }`;
 
     const fragsource = `#version 300 es
     precision mediump float;
 
-    uniform float test;
-    
     out vec4 fragcol;
 
     in vec2 uv;
 
     void main()
     {
-        fragcol = vec4(uv, (1.0 - cos(test)) / 2.0, 1.0);
+        fragcol = vec4(fract(floor(uv) / 16.0), 0.0, 1.0);
     }`;
 
     const vertshad = gl.createShader(gl.VERTEX_SHADER);
@@ -88,12 +92,119 @@ function GLmain()
         return;
     }
 
-    var test = 0;
+    var campos = 
+    {
+        x: 0,
+        y: 0
+    }
+
+    var camvel = 
+    {
+        x: 0,
+        y: 0
+    }
+
+    var inputs = 
+    {
+        up:    false,
+        down:  false,
+        left:  false,
+        right: false
+    }
+
+    var player = 
+    {
+        pos:
+        {
+            x: 0,
+            y: 0
+        },
+        vel:
+        {
+            x: 0,
+            y: 0
+        },
+        acc:
+        {
+            x: 0,
+            y: 0
+        },
+        dir:
+        {
+            x: 0,
+            y: 1
+        }
+    }
+
+    document.addEventListener("keydown", (event) => 
+    {
+        switch(event.code)
+        {
+            case "KeyA":
+                inputs.left  = true;
+                break;
+            case "KeyD":
+                inputs.right = true;
+                break;
+            case "KeyW":
+                inputs.up    = true;
+                break;
+            case "KeyS":
+                inputs.down  = true;
+                break;
+            default:
+                break;
+        }
+    });
+    document.addEventListener("keyup", (event) => 
+    {
+        switch(event.code)
+        {
+            case "KeyA":
+                inputs.left  = false;
+                break;
+            case "KeyD":
+                inputs.right = false;
+                break;
+            case "KeyW":
+                inputs.up    = false;
+                break;
+            case "KeyS":
+                inputs.down  = false;
+                break;
+            default:
+                break;
+        }
+    });
+
+    var speed = 0.250;
+
+    const update = function(dt)
+    {
+        player.vel.x = 0;
+        player.vel.y = 0;
+
+        player.vel.x += inputs.right ? speed : 0.0;
+        player.vel.x -= inputs.left  ? speed : 0.0;
+        player.vel.y += inputs.up    ? speed : 0.0;
+        player.vel.y -= inputs.down  ? speed : 0.0;
+
+        player.pos.x += player.vel.x * dt;
+        player.pos.y += player.vel.y * dt;
+
+        campos.x = player.pos.x;
+        campos.y = player.pos.y;
+    }
+
     const glupdate = function(dt)
     {
-        test += dt;
-        var loc = gl.getUniformLocation(glprogram, "test");
-        gl.uniform1f(loc, test);
+        update(dt);
+
+        var loc = gl.getUniformLocation(glprogram, "campos");
+        gl.uniform2f(loc, campos.x, campos.y);
+
+        loc  = gl.getUniformLocation(glprogram, "aspect");
+        gl.uniform1f(loc, (canvas.height / canvas.width));
     }
 
     var lasttime = performance.now();
