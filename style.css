@@ -1,0 +1,26 @@
+html, head, body
+{
+    background-color:darkslategray;
+}
+
+#glcanvas
+{
+    width: 800px;
+    height: 600px;
+    border: 2px solid white;
+    background-color: coral;
+}
+
+#errbox
+{
+    color:crimson;
+    border: 3px solid white;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.errbox-title
+{
+    color:white;
+    border-bottom:1px solid white;
+}
