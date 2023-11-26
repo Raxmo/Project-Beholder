@@ -45,20 +45,37 @@ function GLmain()
     void main()
     {
         gl_Position = vec4(poss[gl_VertexID], 0.0, 1.0);
-        uv = (poss[gl_VertexID] + campos) * 8.0;
-        uv.y = uv.y * aspect;
+        uv = poss[gl_VertexID];
+        uv.y *= aspect;
+        uv += campos;
     }`;
 
     const fragsource = `#version 300 es
     precision mediump float;
 
+    uniform vec2 playerpos;
+
     out vec4 fragcol;
 
     in vec2 uv;
 
+    vec3 player()
+    {
+        float p = length(uv - playerpos) < 1.0 / 16.0 ? 0.0 : 1.0; 
+
+        return vec3(p);
+    }
+
+    vec3 tiles()
+    {
+        return vec3(fract(floor(uv * 8.0) / 16.0), 0.5);
+    }
+
     void main()
     {
-        fragcol = vec4(fract(floor(uv) / 16.0), 0.0, 1.0);
+        vec3 col = tiles() * player();
+
+        fragcol = vec4(col, 1.0);
     }`;
 
     const vertshad = gl.createShader(gl.VERTEX_SHADER);
@@ -122,19 +139,84 @@ function GLmain()
         vel:
         {
             x: 0,
-            y: 0
+            y: 0,
+            mag: function()
+            {
+                return Math.sqrt(this.x ** 2 + this.y ** 2);
+            }
         },
         acc:
         {
             x: 0,
-            y: 0
+            y: 0,
+            mag: function()
+            {
+                return Math.sqrt(this.x ** 2 + this.y ** 2);
+            }
+            ,normize: function()
+            {
+                this.x /= this.mag();
+                this.y /= this.mag();
+            }
         },
         dir:
         {
             x: 0,
-            y: 1
+            y: 1,
+            mag: function()
+            {
+                return Math.sqrt(this.x ** 2 + this.y ** 2);
+            },
+            norm: function()
+            {
+                this.x /= this.mag();
+                this.y /= this.mag();
+                return this;
+            }
         }
     }
+
+    var cam =
+    {
+        pos:
+        {
+            x: 0,
+            y: 0
+        },
+
+        vel:
+        {
+            x: 0,
+            y: 0
+        },
+
+        f: 2.5,
+        z: 2.5,
+        r: 1.5,
+
+        acc: function()
+        {
+            k1 = this.z / (Math.PI * this.f);
+            k2 = 1 / ((2 * Math.PI * this.f) ** 2);
+            k3 = (this.r * this.z) / (2 * Math.PI * this.f);
+
+            let out = 
+            {
+                x:(player.pos.x + k3 * player.vel.x - this.pos.x - k1 * this.vel.x) / k2,
+                y:(player.pos.y + k3 * player.vel.y - this.pos.y - k1 * this.vel.y) / k2,
+                
+            };
+            return out;
+        }
+    }
+
+    /**
+     * y`` = (x + k3 x` - y - k1 y``) / k2
+     * 
+     * k1 = z / (pi f)
+     * k2 = 1 / ((2pi f) ^ 2)
+     * k3 = (rz) / (2pi f)
+     */
 
     document.addEventListener("keydown", (event) => 
     {
@@ -177,23 +259,49 @@ function GLmain()
         }
     });
 
-    var speed = 0.250;
+    var speed = 10.0;
+    var damp = 5;
 
     const update = function(dt)
     {
-        player.vel.x = 0;
-        player.vel.y = 0;
+        player.acc.x = 0;
+        player.acc.y = 0;
 
-        player.vel.x += inputs.right ? speed : 0.0;
-        player.vel.x -= inputs.left  ? speed : 0.0;
-        player.vel.y += inputs.up    ? speed : 0.0;
-        player.vel.y -= inputs.down  ? speed : 0.0;
+
+
+        player.acc.x += inputs.right ? 1 : 0.0;
+        player.acc.x -= inputs.left  ? 1 : 0.0;
+        player.acc.y += inputs.up    ? 1 : 0.0;
+        player.acc.y -= inputs.down  ? 1 : 0.0;
+        if(player.acc.mag() > 0) player.acc.normize();
+        player.acc.x *= speed;
+        player.acc.y *= speed;
+
+        player.acc.x -= player.vel.x * damp;
+        player.acc.y -= player.vel.y * damp;
+
+        player.vel.x += player.acc.x * dt / 2;
+        player.vel.y += player.acc.y * dt / 2;
 
         player.pos.x += player.vel.x * dt;
         player.pos.y += player.vel.y * dt;
 
-        campos.x = player.pos.x;
-        campos.y = player.pos.y;
+        player.acc.x -= player.vel.x * damp;
+        player.acc.y -= player.vel.y * damp;
+
+        player.vel.x += player.acc.x * dt / 2;
+        player.vel.y += player.acc.y * dt / 2;
+
+        
+        
+        cam.vel.x += dt * cam.acc().x / 2;
+        cam.vel.y += dt * cam.acc().y / 2;
+
+        cam.pos.x += dt * cam.vel.x;
+        cam.pos.y += dt * cam.vel.y;
+
+        cam.vel.x += dt * cam.acc().x / 2;
+        cam.vel.y += dt * cam.acc().y / 2;
     }
 
     const glupdate = function(dt)
@@ -201,10 +309,13 @@ function GLmain()
         update(dt);
 
         var loc = gl.getUniformLocation(glprogram, "campos");
-        gl.uniform2f(loc, campos.x, campos.y);
+        gl.uniform2f(loc, cam.pos.x, cam.pos.y);
 
         loc  = gl.getUniformLocation(glprogram, "aspect");
         gl.uniform1f(loc, (canvas.height / canvas.width));
+
+        loc = gl.getUniformLocation(glprogram, "playerpos");
+        gl.uniform2f(loc, player.pos.x, player.pos.y);
     }
 
     var lasttime = performance.now();
