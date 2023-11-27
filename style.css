@@ -19,6 +19,11 @@ html, head, body
     margin-top: 20px;
 }
 
+#spedometer
+{
+    color:white;
+}
+
 .errbox-title
 {
     color:white;
