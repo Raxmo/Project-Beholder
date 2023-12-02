@@ -10,7 +10,7 @@ function ShowError(errtxt)
 
 
 
-function GLmain()
+async function GLmain()
 {
 /**@type {HTMLCanvasElement | null}*/
 
@@ -27,56 +27,11 @@ function GLmain()
         return;
     }
 
-    const vertsource = `#version 300 es
-    precision mediump float;
+    const vertsource = await fetch('main.vert')
+    .then(response => response.text());
 
-    uniform vec2 campos;
-    uniform float aspect;
-
-    vec2 poss[3] = vec2[]
-    (
-        vec2(-1.0, -1.0),
-        vec2( 3.0, -1.0),
-        vec2(-1.0,  3.0)
-    );
-
-    out vec2 uv;
-    
-    void main()
-    {
-        gl_Position = vec4(poss[gl_VertexID], 0.0, 1.0);
-        uv = poss[gl_VertexID];
-        uv.y *= aspect;
-        uv += campos;
-    }`;
-
-    const fragsource = `#version 300 es
-    precision mediump float;
-
-    uniform vec2 playerpos;
-
-    out vec4 fragcol;
-
-    in vec2 uv;
-
-    vec3 player()
-    {
-        float p = length(uv - playerpos) < 1.0 / 16.0 ? 0.0 : 1.0; 
-
-        return vec3(p);
-    }
-
-    vec3 tiles()
-    {
-        return vec3(fract(floor(uv * 8.0) / 16.0), 0.5);
-    }
-
-    void main()
-    {
-        vec3 col = tiles() * player();
-
-        fragcol = vec4(col, 1.0);
-    }`;
+    const fragsource = await fetch('main.frag')
+    .then(response => response.text());
 
     const vertshad = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertshad, vertsource);
